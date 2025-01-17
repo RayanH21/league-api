@@ -61,6 +61,7 @@ class Champion {
     return rows[0].total;
   }
 
+  // Haal champions op met paginatie en sorteren
   static async findWithPaginationAndSort(limit = 10, offset = 0, sortBy = "id", order = "ASC") {
     const validSortFields = ["id", "name", "role", "difficulty"];
     const validOrder = ["ASC", "DESC"];
@@ -79,7 +80,52 @@ class Champion {
     );
     return rows;
   }
-  
+
+  // Haal een champion op basis van naam
+  static async findByName(name) {
+    const [rows] = await db.query("SELECT * FROM champions WHERE name = ?", [name]);
+    return rows[0];
+  }
+
+  // Zoek champions op meerdere velden
+  static async searchByMultipleFields(searchParams) {
+    const { name, role, difficulty, limit = 10, offset = 0, sortBy = "id", order = "ASC" } = searchParams;
+
+    const validSortFields = ["id", "name", "role", "difficulty"];
+    const validOrder = ["ASC", "DESC"];
+
+    // Controleer of sorteerparameters geldig zijn
+    if (!validSortFields.includes(sortBy)) {
+      throw new Error(`Invalid sort field. Valid fields are: ${validSortFields.join(", ")}`);
+    }
+    if (!validOrder.includes(order.toUpperCase())) {
+      throw new Error(`Invalid order value. Use 'ASC' or 'DESC'.`);
+    }
+
+    let query = "SELECT * FROM champions WHERE 1=1";
+    const params = [];
+
+    // Voeg dynamisch filters toe aan de query
+    if (name) {
+      query += " AND name LIKE ?";
+      params.push(`%${name}%`);
+    }
+    if (role) {
+      query += " AND role LIKE ?";
+      params.push(`%${role}%`);
+    }
+    if (difficulty) {
+      query += " AND difficulty = ?";
+      params.push(difficulty);
+    }
+
+    // Voeg sortering en paginatie toe
+    query += ` ORDER BY ${sortBy} ${order} LIMIT ? OFFSET ?`;
+    params.push(limit, offset);
+
+    const [rows] = await db.query(query, params);
+    return rows;
+  }
 }
 
 module.exports = Champion;
