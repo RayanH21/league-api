@@ -2,10 +2,10 @@ const express = require("express");
 const router = express.Router();
 const Champion = require("../models/champion");
 
-// Haal alle champions op met paginatie en zoeken
+// Haal alle champions op met paginatie, zoeken, en sorteren
 router.get("/", async (req, res) => {
   try {
-    const { limit = 10, offset = 0, search } = req.query;
+    const { limit = 10, offset = 0, search, sortBy = "id", order = "ASC" } = req.query;
 
     // Validatie van limit en offset
     const parsedLimit = parseInt(limit);
@@ -14,18 +14,30 @@ router.get("/", async (req, res) => {
       return res.status(400).json({ error: "Limit and offset must be numbers" });
     }
 
-    let champions;
-    if (search) {
-      // Zoek op naam of rol als 'search' parameter aanwezig is
-      champions = await Champion.searchByNameOrRole(search);
-    } else {
-      // Haal champions op met paginatie
-      champions = await Champion.findWithPagination(parsedLimit, parsedOffset);
+    // Validatie van sorteerparameters
+    const validSortFields = ["id", "name", "role", "difficulty"];
+    if (!validSortFields.includes(sortBy)) {
+      return res.status(400).json({ error: `Invalid sort field. Valid fields are: ${validSortFields.join(", ")}` });
+    }
+    if (!["ASC", "DESC"].includes(order.toUpperCase())) {
+      return res.status(400).json({ error: "Order must be 'ASC' or 'DESC'" });
     }
 
-    res.json(champions);
+    let champions;
+    if (search) {
+      // Zoek champions met sorteren en paginatie
+      champions = await Champion.findWithSearchAndPagination(search, parsedLimit, parsedOffset, sortBy, order);
+    } else {
+      // Haal champions op met paginatie en sorteren
+      champions = await Champion.findWithPaginationAndSort(parsedLimit, parsedOffset, sortBy, order);
+    }
+
+    // Tel het totaal aantal records
+    const total = await Champion.count();
+
+    res.json({ total, champions });
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch champions" });
+    res.status(500).json({ error: error.message || "Failed to fetch champions" });
   }
 });
 

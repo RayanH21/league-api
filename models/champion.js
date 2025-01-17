@@ -60,6 +60,26 @@ class Champion {
     const [rows] = await db.query("SELECT COUNT(*) as total FROM champions");
     return rows[0].total;
   }
+
+  static async findWithPaginationAndSort(limit = 10, offset = 0, sortBy = "id", order = "ASC") {
+    const validSortFields = ["id", "name", "role", "difficulty"];
+    const validOrder = ["ASC", "DESC"];
+  
+    // Controleer of de sorteerparameters geldig zijn
+    if (!validSortFields.includes(sortBy)) {
+      throw new Error(`Invalid sort field. Valid fields are: ${validSortFields.join(", ")}`);
+    }
+    if (!validOrder.includes(order.toUpperCase())) {
+      throw new Error(`Invalid order value. Use 'ASC' or 'DESC'.`);
+    }
+  
+    const [rows] = await db.query(
+      `SELECT * FROM champions ORDER BY ${sortBy} ${order} LIMIT ? OFFSET ?`,
+      [parseInt(limit), parseInt(offset)]
+    );
+    return rows;
+  }
+  
 }
 
 module.exports = Champion;
