@@ -37,73 +37,40 @@ class Champion {
     await db.query("DELETE FROM champions WHERE id = ?", [id]);
   }
 
-  // Haal champions op met paginatie
-  static async findWithPagination(limit = 10, offset = 0) {
-    const [rows] = await db.query(
-      "SELECT * FROM champions LIMIT ? OFFSET ?",
-      [limit, offset]
-    );
-    return rows;
-  }
-
-  // Zoek champions op naam of rol
-  static async searchByNameOrRole(search) {
-    const [rows] = await db.query(
-      "SELECT * FROM champions WHERE name LIKE ? OR role LIKE ?",
-      [`%${search}%`, `%${search}%`]
-    );
-    return rows;
-  }
-
-  // Tel het totaal aantal champions (voor paginatie of statistieken)
-  static async count() {
-    const [rows] = await db.query("SELECT COUNT(*) as total FROM champions");
-    return rows[0].total;
-  }
-
   // Haal champions op met paginatie en sorteren
-  static async findWithPaginationAndSort(limit = 10, offset = 0, sortBy = "id", order = "ASC") {
+  static async findWithPaginationAndSort({ limit = 10, offset = 0, sortBy = ["id"], order = ["ASC"] }) {
     const validSortFields = ["id", "name", "role", "difficulty"];
     const validOrder = ["ASC", "DESC"];
-  
-    // Controleer of de sorteerparameters geldig zijn
-    if (!validSortFields.includes(sortBy)) {
-      throw new Error(`Invalid sort field. Valid fields are: ${validSortFields.join(", ")}`);
-    }
-    if (!validOrder.includes(order.toUpperCase())) {
-      throw new Error(`Invalid order value. Use 'ASC' or 'DESC'.`);
-    }
-  
-    const [rows] = await db.query(
-      `SELECT * FROM champions ORDER BY ${sortBy} ${order} LIMIT ? OFFSET ?`,
-      [parseInt(limit), parseInt(offset)]
-    );
+
+    const sortQueries = sortBy.map((field, index) => {
+      if (!validSortFields.includes(field)) {
+        throw new Error(`Invalid sort field: ${field}`);
+      }
+      const sortOrder = validOrder.includes(order[index]?.toUpperCase()) ? order[index].toUpperCase() : "ASC";
+      return `${field} ${sortOrder}`;
+    });
+
+    const query = `SELECT * FROM champions ORDER BY ${sortQueries.join(", ")} LIMIT ? OFFSET ?`;
+    const [rows] = await db.query(query, [parseInt(limit), parseInt(offset)]);
     return rows;
   }
 
-  // Haal een champion op basis van naam
-  static async findByName(name) {
-    const [rows] = await db.query("SELECT * FROM champions WHERE name = ?", [name]);
-    return rows[0];
-  }
-
-  // Zoek champions op meerdere velden
-  static async searchByMultipleFields({ name, role, difficulty, limit = 10, offset = 0, sortBy = "id", order = "ASC" }) {
+  // Zoek champions op meerdere velden met filters
+  static async searchByMultipleFields({ name, role, difficulty, limit = 10, offset = 0, sortBy = ["id"], order = ["ASC"] }) {
     const validSortFields = ["id", "name", "role", "difficulty"];
     const validOrder = ["ASC", "DESC"];
-  
-    // Controleer of sorteerparameters geldig zijn
-    if (!validSortFields.includes(sortBy)) {
-      throw new Error(`Invalid sort field. Valid fields are: ${validSortFields.join(", ")}`);
-    }
-    if (!validOrder.includes(order.toUpperCase())) {
-      throw new Error(`Invalid order value. Use 'ASC' or 'DESC'.`);
-    }
-  
+
+    const sortQueries = sortBy.map((field, index) => {
+      if (!validSortFields.includes(field)) {
+        throw new Error(`Invalid sort field: ${field}`);
+      }
+      const sortOrder = validOrder.includes(order[index]?.toUpperCase()) ? order[index].toUpperCase() : "ASC";
+      return `${field} ${sortOrder}`;
+    });
+
     let query = "SELECT * FROM champions WHERE 1=1";
     const params = [];
-  
-    // Voeg dynamisch filters toe aan de query
+
     if (name) {
       query += " AND name LIKE ?";
       params.push(`%${name}%`);
@@ -116,15 +83,19 @@ class Champion {
       query += " AND difficulty = ?";
       params.push(difficulty);
     }
-  
-    // Voeg sortering en paginatie toe
-    query += ` ORDER BY ${sortBy} ${order} LIMIT ? OFFSET ?`;
+
+    query += ` ORDER BY ${sortQueries.join(", ")} LIMIT ? OFFSET ?`;
     params.push(limit, offset);
-  
+
     const [rows] = await db.query(query, params);
     return rows;
   }
-  
+
+  // Tel het totaal aantal champions
+  static async count() {
+    const [rows] = await db.query("SELECT COUNT(*) as total FROM champions");
+    return rows[0].total;
+  }
 }
 
 module.exports = Champion;

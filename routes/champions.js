@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const Champion = require("../models/champion");
+const authenticate = require("../middleware/auth"); // Middleware voor authenticatie
 
 // Helperfunctie voor validatie
 const validRoles = ["Mage", "Marksman", "Tank", "Support", "Assassin", "Fighter"];
@@ -8,75 +9,49 @@ const validRoles = ["Mage", "Marksman", "Tank", "Support", "Assassin", "Fighter"
 const validateChampion = async (data, isUpdate = false) => {
   const { name, role, difficulty, description } = data;
 
-  // Controleer verplichte velden
   if (!isUpdate && (!name || !role || !difficulty)) {
     return "Name, role, and difficulty are required.";
   }
 
-  // Controleer of 'role' geldig is
   if (role && !validRoles.includes(role)) {
     return `Invalid role. Valid roles are: ${validRoles.join(", ")}.`;
   }
 
-  // Controleer op numerieke waarden en valid range
-  if (difficulty !== undefined && (typeof difficulty !== "number" || difficulty < 1 || difficulty > 5)) {
-    return "Difficulty must be a number between 1 and 5.";
+  if (difficulty !== undefined && (typeof difficulty !== "number" || isNaN(difficulty))) {
+    return "Difficulty must be a number.";
   }
-
-  // Controleer lengte van description
-  if (description && description.length < 1) {
-    return "Description must contain at least one character.";
-  }
-  if (description && description.length > 255) {
-    return "Description cannot exceed 255 characters.";
-  }
-
-  // Controleer of de naam uniek is
-  if (name) {
-    const existingChampion = await Champion.findByName(name);
-    if (existingChampion && (!isUpdate || existingChampion.id !== data.id)) {
-      return "A champion with this name already exists.";
-    }
+  if (difficulty < 1 || difficulty > 5) {
+    return "Difficulty must be between 1 and 5.";
   }
 
   return null; // Geen validatiefouten
 };
-
-
 
 // Haal alle champions op met zoeken, paginatie, en sorteren
 router.get("/", async (req, res) => {
   try {
     const { limit = 10, offset = 0, name, role, difficulty, sortBy = "id", order = "ASC" } = req.query;
 
-    // Validatie van limit en offset
     const parsedLimit = parseInt(limit);
     const parsedOffset = parseInt(offset);
+
     if (isNaN(parsedLimit) || isNaN(parsedOffset)) {
       return res.status(400).json({ error: "Limit and offset must be numbers" });
     }
 
-    // Validatie van sorteerparameters
-    const validSortFields = ["id", "name", "role", "difficulty"];
-    if (!validSortFields.includes(sortBy)) {
-      return res.status(400).json({ error: `Invalid sort field. Valid fields are: ${validSortFields.join(", ")}` });
-    }
-    if (!["ASC", "DESC"].includes(order.toUpperCase())) {
-      return res.status(400).json({ error: "Order must be 'ASC' or 'DESC'" });
-    }
+    const sortByArray = sortBy.split(",");
+    const orderArray = order.split(",");
 
-    // Zoek champions met filters, paginatie en sorteren
     const champions = await Champion.searchByMultipleFields({
       name,
       role,
       difficulty,
       limit: parsedLimit,
       offset: parsedOffset,
-      sortBy,
-      order,
+      sortBy: sortByArray,
+      order: orderArray,
     });
 
-    // Tel het totale aantal resultaten
     const total = await Champion.count();
 
     res.json({ total, champions });
@@ -98,8 +73,8 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// Voeg een nieuwe champion toe
-router.post("/", async (req, res) => {
+// Voeg een nieuwe champion toe (alleen geauthenticeerde gebruikers)
+router.post("/", authenticate, async (req, res) => {
   try {
     const error = await validateChampion(req.body);
     if (error) {
@@ -114,8 +89,8 @@ router.post("/", async (req, res) => {
   }
 });
 
-// Update een bestaande champion
-router.put("/:id", async (req, res) => {
+// Update een bestaande champion (alleen geauthenticeerde gebruikers)
+router.put("/:id", authenticate, async (req, res) => {
   try {
     const champion = await Champion.findById(req.params.id);
     if (!champion) {
@@ -135,8 +110,8 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// Verwijder een champion
-router.delete("/:id", async (req, res) => {
+// Verwijder een champion (alleen geauthenticeerde gebruikers)
+router.delete("/:id", authenticate, async (req, res) => {
   try {
     const champion = await Champion.findById(req.params.id);
     if (!champion) {
