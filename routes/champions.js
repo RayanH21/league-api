@@ -3,14 +3,19 @@ const router = express.Router();
 const Champion = require("../models/champion");
 
 // Helperfunctie voor validatie
+const validRoles = ["Mage", "Marksman", "Tank", "Support", "Assassin", "Fighter"];
+
 const validateChampion = async (data, isUpdate = false) => {
   const { name, role, difficulty, description } = data;
 
   // Controleer verplichte velden
-  if (!isUpdate) {
-    if (!name || !role || !difficulty) {
-      return "Name, role, and difficulty are required.";
-    }
+  if (!isUpdate && (!name || !role || !difficulty)) {
+    return "Name, role, and difficulty are required.";
+  }
+
+  // Controleer of 'role' geldig is
+  if (role && !validRoles.includes(role)) {
+    return `Invalid role. Valid roles are: ${validRoles.join(", ")}.`;
   }
 
   // Controleer op numerieke waarden en valid range
@@ -19,11 +24,14 @@ const validateChampion = async (data, isUpdate = false) => {
   }
 
   // Controleer lengte van description
+  if (description && description.length < 1) {
+    return "Description must contain at least one character.";
+  }
   if (description && description.length > 255) {
     return "Description cannot exceed 255 characters.";
   }
 
-  // Controleer of de naam uniek is (bij POST of als de naam verandert bij PUT)
+  // Controleer of de naam uniek is
   if (name) {
     const existingChampion = await Champion.findByName(name);
     if (existingChampion && (!isUpdate || existingChampion.id !== data.id)) {
@@ -33,6 +41,8 @@ const validateChampion = async (data, isUpdate = false) => {
 
   return null; // Geen validatiefouten
 };
+
+
 
 // Haal alle champions op met zoeken, paginatie, en sorteren
 router.get("/", async (req, res) => {

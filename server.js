@@ -154,6 +154,13 @@ app.get("/", (req, res) => {
   `);
 });
 
+// Error-handling middleware
+app.use((err, req, res, next) => {
+    console.error(err.stack); // Log de fout naar de console
+    res.status(500).json({ error: "Something went wrong!" });
+  });
+
+
 // Start server
 app.listen(PORT, () => {
   console.log(`League API running on http://localhost:${PORT}`);
